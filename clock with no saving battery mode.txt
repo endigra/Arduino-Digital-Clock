@@ -1,0 +1,346 @@
+// Please go subscribe to my YT channel 
+
+#include <SPI.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_ST7735.h>
+#include <RTC.h>
+
+// TFT pins
+#define TFT_CS   6
+#define TFT_DC   7
+#define TFT_RST  10
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+
+// Buttons
+#define MODE_BTN 2
+#define UP_BTN   3
+#define DOWN_BTN 4
+
+// Alarm outputs
+#define BUZZER 8
+#define MOTOR  9
+
+int mode = 0; // 0 = normal, 1 = set time, 2 = set alarm, 3 = alarm on/off
+int alarmHour = 7;
+int alarmMinute = 0;
+bool alarmRinging = false;
+bool alarmEnabled = true;
+
+// For non-blocking updates
+unsigned long lastDisplayUpdate = 0;
+unsigned long lastMotorToggle = 0;
+bool motorState = false;
+
+// Previous values for flicker-free updates
+int prevH = -1, prevM = -1, prevS = -1;
+int prevAlarmH = -1, prevAlarmM = -1;
+
+// For set time/alarm screens
+int prevSetH = -1, prevSetM = -1;
+int prevAlarmSetH = -1, prevAlarmSetM = -1;
+
+bool firstDraw = true;
+
+// ---------------- Draw Smiley Emoji ----------------
+void drawSmiley(int x, int y) {
+  // Face
+  tft.fillCircle(x, y, 6, ST77XX_YELLOW);
+
+  // Eyes
+  tft.fillCircle(x - 2, y - 2, 1, ST77XX_BLACK);
+  tft.fillCircle(x + 2, y - 2, 1, ST77XX_BLACK);
+
+  // Smile
+  tft.drawPixel(x - 2, y + 2, ST77XX_BLACK);
+  tft.drawPixel(x - 1, y + 3, ST77XX_BLACK);
+  tft.drawPixel(x,     y + 3, ST77XX_BLACK);
+  tft.drawPixel(x + 1, y + 3, ST77XX_BLACK);
+  tft.drawPixel(x + 2, y + 2, ST77XX_BLACK);
+}
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(MODE_BTN, INPUT_PULLUP);
+  pinMode(UP_BTN, INPUT_PULLUP);
+  pinMode(DOWN_BTN, INPUT_PULLUP);
+
+  pinMode(BUZZER, OUTPUT);
+  pinMode(MOTOR, OUTPUT);
+
+  RTC.begin();
+
+  tft.initR(INITR_BLACKTAB);
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setRotation(1);
+  tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+}
+
+void loop() {
+  // MODE button to switch modes
+  if (!digitalRead(MODE_BTN)) {
+    delay(200);
+    mode++;
+    if (mode > 3) mode = 0;
+
+    firstDraw = true;
+    prevSetH = prevSetM = -1;
+    prevAlarmSetH = prevAlarmSetM = -1;
+    prevH = prevM = prevS = -1;
+  }
+
+  if (mode == 0) normalMode();
+  if (mode == 1) setTimeMode();
+  if (mode == 2) setAlarmMode();
+  if (mode == 3) alarmToggleMode();
+
+  handleAlarm();
+}
+
+// ---------------- Normal Clock Display ----------------
+void normalMode() {
+  if (firstDraw) {
+    tft.fillScreen(ST77XX_BLACK);
+    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+
+    // Alarm label
+    tft.setTextSize(1);
+    tft.setCursor(10, 10);
+    tft.print("Alarm:");
+
+    // Draw static colons
+    tft.setTextSize(3);
+    tft.setCursor(45, 40);
+    tft.print(":");
+
+    tft.setCursor(90, 40);
+    tft.print(":");
+
+    // Signature line (two lines)
+    tft.setTextSize(1);
+    tft.setCursor(10, 85);
+    tft.print("Made and designed by:");
+
+    tft.setCursor(10, 100);
+    tft.print("Endigra");
+
+    // Draw smiley next to "YOUR NAME"
+    drawSmiley(80, 103);
+
+    firstDraw = false;
+  }
+
+  if (millis() - lastDisplayUpdate < 200) return;
+  lastDisplayUpdate = millis();
+
+  RTCTime now;
+  RTC.getTime(now);
+
+  int h = now.getHour();
+  int m = now.getMinutes();
+  int s = now.getSeconds();
+
+  tft.setTextSize(3);
+
+  if (h != prevH) {
+    tft.setCursor(10, 40);
+    if (h < 10) tft.print("0");
+    tft.print(h);
+    prevH = h;
+  }
+
+  if (m != prevM) {
+    tft.setCursor(55, 40);
+    if (m < 10) tft.print("0");
+    tft.print(m);
+    prevM = m;
+  }
+
+  if (s != prevS) {
+    tft.setCursor(100, 40);
+    if (s < 10) tft.print("0");
+    tft.print(s);
+    prevS = s;
+  }
+
+  if (alarmEnabled) {
+    if (alarmHour != prevAlarmH || alarmMinute != prevAlarmM) {
+      tft.setTextSize(1);
+      tft.setCursor(60, 10);
+      if (alarmHour < 10) tft.print("0");
+      tft.print(alarmHour);
+      tft.print(":");
+      if (alarmMinute < 10) tft.print("0");
+      tft.print(alarmMinute);
+
+      prevAlarmH = alarmHour;
+      prevAlarmM = alarmMinute;
+    }
+  } else {
+    tft.fillRect(60, 10, 60, 10, ST77XX_BLACK);
+  }
+}
+
+// ---------------- Set Time Mode ----------------
+void setTimeMode() {
+  RTCTime now;
+  RTC.getTime(now);
+  int h = now.getHour();
+  int m = now.getMinutes();
+
+  if (firstDraw) {
+    tft.fillScreen(ST77XX_BLUE);
+    tft.setTextColor(ST77XX_WHITE, ST77XX_BLUE);
+
+    tft.setTextSize(2);
+    tft.setCursor(10, 10);
+    tft.print("SET TIME");
+
+    firstDraw = false;
+  }
+
+  if (!digitalRead(UP_BTN)) {
+    delay(150);
+    h = (h + 1) % 24;
+    now.setHour(h);
+    RTC.setTime(now);
+  }
+
+  if (!digitalRead(DOWN_BTN)) {
+    delay(150);
+    m = (m + 1) % 60;
+    now.setMinute(m);
+    RTC.setTime(now);
+  }
+
+  if (h != prevSetH || m != prevSetM) {
+    tft.setTextSize(3);
+    tft.setCursor(10, 50);
+
+    if (h < 10) tft.print("0");
+    tft.print(h);
+    tft.print(":");
+    if (m < 10) tft.print("0");
+    tft.print(m);
+
+    prevSetH = h;
+    prevSetM = m;
+  }
+}
+
+// ---------------- Set Alarm Mode ----------------
+void setAlarmMode() {
+  if (firstDraw) {
+    tft.fillScreen(ST77XX_RED);
+    tft.setTextColor(ST77XX_WHITE, ST77XX_RED);
+
+    tft.setTextSize(2);
+    tft.setCursor(10, 10);
+    tft.print("SET ALARM");
+
+    firstDraw = false;
+  }
+
+  if (!digitalRead(UP_BTN)) {
+    delay(150);
+    alarmHour = (alarmHour + 1) % 24;
+    alarmEnabled = true;
+  }
+
+  if (!digitalRead(DOWN_BTN)) {
+    delay(150);
+    alarmMinute = (alarmMinute + 1) % 60;
+    alarmEnabled = true;
+  }
+
+  if (alarmHour != prevAlarmSetH || alarmMinute != prevAlarmSetM) {
+    tft.setTextSize(3);
+    tft.setCursor(10, 50);
+
+    if (alarmHour < 10) tft.print("0");
+    tft.print(alarmHour);
+    tft.print(":");
+    if (alarmMinute < 10) tft.print("0");
+    tft.print(alarmMinute);
+
+    prevAlarmSetH = alarmHour;
+    prevAlarmSetM = alarmMinute;
+  }
+}
+
+// ---------------- Alarm ON/OFF Screen ----------------
+void alarmToggleMode() {
+  if (firstDraw) {
+    tft.fillScreen(ST77XX_GREEN);
+    tft.setTextColor(ST77XX_BLACK, ST77XX_GREEN);
+
+    tft.setTextSize(2);
+    tft.setCursor(10, 10);
+    tft.print("ALARM");
+
+    firstDraw = false;
+  }
+
+  tft.setTextSize(3);
+  tft.setCursor(10, 50);
+  tft.print(alarmEnabled ? "ON " : "OFF");
+
+  if (!digitalRead(UP_BTN)) {
+    delay(150);
+    alarmEnabled = true;
+  }
+
+  if (!digitalRead(DOWN_BTN)) {
+    delay(150);
+    alarmEnabled = false;
+  }
+}
+
+// ---------------- Alarm Handler ----------------
+void handleAlarm() {
+  RTCTime now;
+  RTC.getTime(now);
+
+  int h = now.getHour();
+  int m = now.getMinutes();
+
+  if (alarmEnabled && h == alarmHour && m == alarmMinute) {
+    alarmRinging = true;
+  }
+
+  if (alarmRinging) {
+    tone(BUZZER, 2000);
+
+    if (millis() - lastMotorToggle > 200) {
+      lastMotorToggle = millis();
+      motorState = !motorState;
+      digitalWrite(MOTOR, motorState ? HIGH : LOW);
+    }
+
+    if (!digitalRead(UP_BTN)) {
+      alarmRinging = false;
+      alarmEnabled = false;
+      noTone(BUZZER);
+      digitalWrite(MOTOR, LOW);
+
+      mode = 0;
+      firstDraw = true;
+      prevH = prevM = prevS = -1;
+      prevAlarmH = prevAlarmM = -1;
+
+      delay(200);
+    }
+
+  } else {
+    noTone(BUZZER);
+    digitalWrite(MOTOR, LOW);
+  }
+
+  if (!digitalRead(MODE_BTN) && alarmRinging) {
+    alarmRinging = false;
+    alarmEnabled = false;
+    noTone(BUZZER);
+    digitalWrite(MOTOR, LOW);
+    delay(200);
+  }
+}
