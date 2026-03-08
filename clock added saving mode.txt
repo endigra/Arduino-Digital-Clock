@@ -43,7 +43,7 @@ int prevAlarmSetH = -1, prevAlarmSetM = -1;
 
 bool firstDraw = true;
 
-// ---------------- Draw Smiley Emoji ----------------
+
 void drawSmiley(int x, int y) {
   // Face
   tft.fillCircle(x, y, 6, ST77XX_YELLOW);
@@ -60,7 +60,7 @@ void drawSmiley(int x, int y) {
   tft.drawPixel(x + 2, y + 2, ST77XX_BLACK);
 }
 
-// ---------------- Screen Power Control ----------------
+
 void turnScreenOff() {
   tft.fillScreen(ST77XX_BLACK);
   tft.writeCommand(ST77XX_SLPIN);
@@ -98,13 +98,13 @@ void setup() {
 
 void loop() {
 
-  // ---------------- Battery Saving: Wake on any button ----------------
+  
   if (!digitalRead(MODE_BTN) || !digitalRead(UP_BTN) || !digitalRead(DOWN_BTN)) {
     lastInteraction = millis();
     if (screenOff) turnScreenOn();
   }
 
-  // ---------------- Auto screen off after 15 seconds ----------------
+  
   if (!screenOff && millis() - lastInteraction > 15000) {
     turnScreenOff();
   }
@@ -135,7 +135,7 @@ void loop() {
   handleAlarm();
 }
 
-// ---------------- Normal Clock Display ----------------
+
 void normalMode() {
   if (firstDraw) {
     tft.fillScreen(ST77XX_BLACK);
@@ -219,7 +219,7 @@ void normalMode() {
   }
 }
 
-// ---------------- Set Time Mode ----------------
+
 void setTimeMode() {
   RTCTime now;
   RTC.getTime(now);
@@ -266,7 +266,7 @@ void setTimeMode() {
   }
 }
 
-// ---------------- Set Alarm Mode ----------------
+
 void setAlarmMode() {
   if (firstDraw) {
     tft.fillScreen(ST77XX_RED);
@@ -306,7 +306,7 @@ void setAlarmMode() {
   }
 }
 
-// ---------------- Alarm ON/OFF Screen ----------------
+
 void alarmToggleMode() {
   if (firstDraw) {
     tft.fillScreen(ST77XX_GREEN);
@@ -334,7 +334,7 @@ void alarmToggleMode() {
   }
 }
 
-// ---------------- Alarm Handler ----------------
+
 void handleAlarm() {
   RTCTime now;
   RTC.getTime(now);
@@ -375,4 +375,5 @@ void handleAlarm() {
     noTone(BUZZER);
     digitalWrite(MOTOR, LOW);
   }
+
 }
