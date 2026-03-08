@@ -1,11 +1,11 @@
-// Please go subscribe to my YT channel 
+// Please go subscribe to my YT channel https://www.youtube.com/@BreadboardBros
 
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h>
 #include <RTC.h>
 
-// TFT pins
+
 #define TFT_CS   6
 #define TFT_DC   7
 #define TFT_RST  10
@@ -41,16 +41,14 @@ int prevAlarmSetH = -1, prevAlarmSetM = -1;
 
 bool firstDraw = true;
 
-// ---------------- Draw Smiley Emoji ----------------
+// let's add the smilling emoji ;)
 void drawSmiley(int x, int y) {
-  // Face
+  
   tft.fillCircle(x, y, 6, ST77XX_YELLOW);
 
-  // Eyes
   tft.fillCircle(x - 2, y - 2, 1, ST77XX_BLACK);
   tft.fillCircle(x + 2, y - 2, 1, ST77XX_BLACK);
 
-  // Smile
   tft.drawPixel(x - 2, y + 2, ST77XX_BLACK);
   tft.drawPixel(x - 1, y + 3, ST77XX_BLACK);
   tft.drawPixel(x,     y + 3, ST77XX_BLACK);
@@ -97,7 +95,6 @@ void loop() {
   handleAlarm();
 }
 
-// ---------------- Normal Clock Display ----------------
 void normalMode() {
   if (firstDraw) {
     tft.fillScreen(ST77XX_BLACK);
@@ -124,7 +121,7 @@ void normalMode() {
     tft.setCursor(10, 100);
     tft.print("Endigra");
 
-    // Draw smiley next to "YOUR NAME"
+    //smiley next to "YOUR NAME"
     drawSmiley(80, 103);
 
     firstDraw = false;
@@ -181,7 +178,7 @@ void normalMode() {
   }
 }
 
-// ---------------- Set Time Mode ----------------
+//SET TIME
 void setTimeMode() {
   RTCTime now;
   RTC.getTime(now);
@@ -228,7 +225,7 @@ void setTimeMode() {
   }
 }
 
-// ---------------- Set Alarm Mode ----------------
+//SET ALARM
 void setAlarmMode() {
   if (firstDraw) {
     tft.fillScreen(ST77XX_RED);
@@ -268,7 +265,7 @@ void setAlarmMode() {
   }
 }
 
-// ---------------- Alarm ON/OFF Screen ----------------
+//Alarm ON/OFF
 void alarmToggleMode() {
   if (firstDraw) {
     tft.fillScreen(ST77XX_GREEN);
@@ -296,7 +293,6 @@ void alarmToggleMode() {
   }
 }
 
-// ---------------- Alarm Handler ----------------
 void handleAlarm() {
   RTCTime now;
   RTC.getTime(now);
@@ -343,4 +339,5 @@ void handleAlarm() {
     digitalWrite(MOTOR, LOW);
     delay(200);
   }
+
 }
